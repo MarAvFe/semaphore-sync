@@ -1,5 +1,10 @@
-// Aloca el espacio para almacenar 4 enteros en memoria compartida y luego los libera
-// Compilar usual con gcc y correr sin parámetros
+// Muestra el flujo de comportamiento de la memoria compartida.
+// Reserva una cantidad, consulta e imprime su información, la adjunta, escribe,
+//   lee de ella, la desadjunta y la libera.
+// Compilar:
+//   user:~$ gcc shmgetUse.c -o shmuse -Wall
+// Ejecutar:
+//   user:~$ ./shmuse
 // http://pubs.opengroup.org/onlinepubs/009695399/functions/shmctl.html
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,36 +17,30 @@
 
 void error(const char *msg);
 
-struct shmid_ds /*{
-  struct ipc_perm shm_perm,
-  size_t shm_segsz,
-  pid_t shm_lpid,
-  pid_t shm_cpid,
-  shmatt_t shm_nattch,
-  time_t shm_atime,
-  time_t shm_dtime,
-  time_t shm_ctime
-}*/ shm_id_ds;
+struct shmid_ds shm_id_ds;
 struct shmid_ds * ptrDs = &shm_id_ds;
+int shm_id; // Address of first shared memory byte
+int * memy; // Map shared memory access
 
 int main(int argc, char *argv[])
 {
-  int shm_id;                                                       // Address of first shared memory byte
+  int resSize = 4*sizeof(int); // Reserved size
   int err;
-  int resSize = 4*sizeof(int);                                      // Reserved size
 
   // Reserve shared memory
-  shm_id = shmget(IPC_PRIVATE, resSize, IPC_CREAT | 0666);          // Reserve with read/write permission
+  shm_id = shmget(IPC_PRIVATE, resSize, IPC_CREAT | 0666); // Reserve with read/write (0666) permission
   if (shm_id < 0) {
      printf("shmget error\n");
      exit(1);
   }
-  printf("Reserved %i bytes starting in &%i\n", resSize, shm_id);
+  printf("Reserved %i bytes starting in %i\n", resSize, shm_id);
 
-  // Release reserved memory
-  err = shmctl(shm_id, IPC_STAT, ptrDs);                             // Load data structure of shared memory
+  memy = &shm_id;
+
+  // Load data structure of shared memory
+  err = shmctl(shm_id, IPC_STAT, ptrDs);
   if(err == 0 ){
-    printf("Sum intel: \n");                                         // Print all data structure info
+    printf("Shared memory info: \n"); // Print all data structure info
     printf("    shm_perm:\n");
     printf("        uid: %i\n", shm_id_ds.shm_perm.uid);
     printf("        gid: %i\n", shm_id_ds.shm_perm.gid);
@@ -57,9 +56,39 @@ int main(int argc, char *argv[])
     printf("Error(%i) releasing memory: %s.\n", errno, strerror(errno));
   }
 
+  // Attach memory segment to process
+  memy = (int *)shmat(shm_id, 0, 0);
+  if(errno == -1){
+    printf("Error attaching memory: %s.\n", strerror(errno));
+  }else{
+    printf("Attached memory in %i.\n", shm_id);
+  }
+
+  int i;
+  // Write to shared memory
+  printf("Writing...\n");
+  for(i=0; i<4; i++){
+      memy[i] = i*i;
+  }
+
+
+  // Read from shared memory
+  printf("Reading...\n");
+  for(i=0; i<4; i++){
+      printf("memy[%i] = %i\n", i, memy[i]);
+  }
+
+  // Detach memory segment to process
+  shmdt((void *) memy);
+  if(errno == -1){
+    printf("Error detaching memory: %s.\n", strerror(errno));
+  }else{
+    printf("Detached memory in %i.\n", shm_id);
+  }
+
   // Release reserved memory
-  err = shmctl(shm_id, IPC_RMID, NULL);                             // Release reserved memory
-  if(err == 0 ){
+  err = shmctl(shm_id, IPC_RMID, ptrDs);
+  if(err == 0){
     printf("Released memory in %i.\n", shm_id);
   }else{
     printf("Error releasing memory: %s.\n", strerror(errno));
