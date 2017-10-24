@@ -10,9 +10,9 @@
 
 void main(int argc, char *argv[]){
 
-	int memory_size; // tamaño de bytes que deseamos para la memoria.
-	int memory_id; // identificador de la zona de memoria.
-	int *memory; // puntero a la zona de memoria.
+	int memory_size, threads_size; // tamaño de bytes que deseamos para la memoria.
+	int memory_id, threads_id; // identificador de la zona de memoria.
+	int *memory, *threadPtrs; // puntero a la zona de memoria.
 
     printf("╔═════════════════════════════════════╗\n");
     printf("║.............INITIALIZER.............║\n");
@@ -22,6 +22,9 @@ void main(int argc, char *argv[]){
 	/*printf(">> Enter memory size: ");
 	scanf("%d",&memory_size);*/
 	memory_size = MEMSIZE * UNITSIZE;
+
+	struct thread_info * ptrthi;
+	threads_size = LIMITPROCESSES * sizeof(pthread_t);
 
 	// Función int shmget (key_t, int, int).
 	// Creamos la memoria y nos devuelve un identificador para dicha zona.
@@ -48,17 +51,30 @@ void main(int argc, char *argv[]){
 		exit(1);
 	}
 
+	if ((threads_id = shmget(THREADS_KEY, threads_size, IPC_CREAT | RWPERM)) < 0) {
+		perror("shmget threads");
+		exit(1);
+	}
+
+	if ((threadPtrs = shmat(threads_id, NULL, 0)) == (int *) -1) {
+		perror("shmat threads");
+		exit(1);
+	}
 
 	// Reset memory spaces
-	for (int i = 0; i < memory_size; i += UNITSIZE) {
+	for (int i = 0; i < memory_size; i++) {
 		printf("%p: mem[%lu]=%i -> ", &memory[i], i/UNITSIZE, memory[i]);
 		memory[i] = -1;
 		printf("%i\n", memory[i]);
 	}
 
 	printf("memy: %p\n", memory);
+	printf("memz: %p\n", threadPtrs);
 
-	shmdt(memory);
 
 	printf("memory_id: %d with key: %i\n",memory_id, MEMORY_KEY);
+
+	printf("threadPtrs: %d with key: %i\n",threads_id, THREADS_KEY);
+	shmdt(memory);
+	shmdt(threadPtrs);
 }

@@ -17,9 +17,9 @@ do { perror(msg); exit(EXIT_FAILURE); } while (0)
 
 
 sem_t semLogFile, semGetMemory;
-int schema = PAGINATION;
 int pageTable[NUMPAGES];
 int * memory, memory_id, memory_size;
+int threads_size, threads_id, *threadPtrs;
 
 int getPageIndex();
 int getEmptyPage();
@@ -30,40 +30,100 @@ void clearPageTableRow(int);
 void setPageTableRow(int, int);
 int allocateThreadShm(void *);
 int releaseThreadShm(void *);
+int nextThreadPage(int, int);
 void dumpMemory();
-
-struct thread_info {          /* Used as argument to thread_start() */
-  pthread_t thread_id;        /* ID returned by pthread_create() */
-  int       thread_num;       /* Application-defined thread # */
-  int       numPages;
-  int       timeWait;
-};
 
 static void * thread_start(void *arg){
   struct thread_info *tinfo = arg;
 
   printf("Thread %d: size %i pages, to wait %i seconds.\n", tinfo->thread_num, tinfo->numPages, tinfo->timeWait);
 
+  time_t timer;
+  char buffer[26];
+  struct tm* tm_info;
+
   sem_wait(&semGetMemory);
+  tidGettingMemory = tinfo->thread_num;
+  tinfo->stage = SCHSPC;
   int alloc = allocateThreadShm(arg);
-  sem_post(&semGetMemory);
-
-  if (alloc != 0) printf("Failed to allocate tid: %i\n", tinfo->thread_num);
-
-  sleep(tinfo->timeWait);
 
   sem_wait(&semLogFile);
-  writeIntoFile("w: ");
+  time(&timer);
+  tm_info = localtime(&timer);
+  strftime(buffer, 26, "%H:%M:%S", tm_info);
+
+  tinfo->stage = WRTLG1;
+  writeIntoFile(buffer);
+  writeIntoFile(" ASSIGN: ");
   writeIntIntoFile(tinfo->thread_num);
+  if (schema == PAGINATION) {
+    writeIntoFile(", pages: [");
+    int pastPage = 0;
+    for (int i = 0; i < tinfo->numPages; i++) {
+      pastPage = nextThreadPage(tinfo->thread_num, pastPage);
+      if (pastPage < 0) break;
+      if (pastPage == 0) pastPage++;
+      writeIntoFile("(");
+      writeIntIntoFile(i+1);
+      writeIntoFile(",");
+      writeIntIntoFile(pastPage);
+      writeIntoFile("), ");
+    }
+    writeIntoFile("]");
+  }
   writeIntoFile("\n");
   sem_post(&semLogFile);
+
+  tinfo->stage = GVMEM1;
+  sem_post(&semGetMemory);
+
+  if (alloc != 0){
+    printf("DEEEEEEED: %i\n", tinfo->thread_num);
+    tinfo->stage = DED;
+    return 0;
+  };
+
+  tinfo->stage = SLEEPS;
+  sleep(tinfo->timeWait);
+
   printf("Thread %d: Finished wait.\n", tinfo->thread_num);
 
-  if (alloc == 0) {
-    sem_wait(&semGetMemory);
-    releaseThreadShm(arg);
-    sem_post(&semGetMemory);
+  tinfo->stage = WTMEM2;
+  sem_wait(&semGetMemory);
+
+  sem_wait(&semLogFile);
+  time(&timer);
+  tm_info = localtime(&timer);
+  strftime(buffer, 26, "%H:%M:%S", tm_info);
+  tinfo->stage = WRTLG1;
+  writeIntoFile(buffer);
+  writeIntoFile(" DISIGN: ");
+  writeIntIntoFile(tinfo->thread_num);
+  if (schema == PAGINATION) {
+    writeIntoFile(", pages: [");
+    int pastPage = 0;
+    for (int i = 0; i < tinfo->numPages; i++) {
+      pastPage = nextThreadPage(tinfo->thread_num, pastPage);
+      if (pastPage < 0) break;
+      if (pastPage == 0) pastPage++;
+      writeIntoFile("(");
+      writeIntIntoFile(i+1);
+      writeIntoFile(",");
+      writeIntIntoFile(pastPage);
+      writeIntoFile("), ");
+    }
+    writeIntoFile("]");
   }
+  writeIntoFile("\n");
+  sem_post(&semLogFile);
+
+  tinfo->stage = RLSSPC;
+  releaseThreadShm(arg);
+
+  tinfo->stage = GVMEM2;
+  sem_post(&semGetMemory);
+
+  tinfo->stage = FNSHED;
   return 0;
 }
 
@@ -77,18 +137,30 @@ int main(int argc, char * argv[]){
   ptrLogFile = "actions.log";
   num_threads = randint(3,14);
 	memory_size = MEMSIZE * UNITSIZE;
+	threads_size = LIMITPROCESSES * sizeof(pthread_t);
+  schema = PAGINATION;
 
   createFile();
+
 
   if ((memory_id = shmget(MEMORY_KEY, memory_size, RWPERM)) < 0) {
 		perror("shmget");
 		exit(1);
 	}
-
   if ((memory = shmat(memory_id, NULL, 0)) == NULL) {
 		perror("shmat");
 		exit(1);
 	}
+
+  if ((threads_id = shmget(THREADS_KEY, threads_size, RWPERM)) < 0) {
+    perror("shmget threads");
+    exit(1);
+  }
+
+  if ((threadPtrs = shmat(threads_id, NULL, 0)) == NULL) {
+    perror("shmat threads");
+    exit(1);
+  }
 
   sem_init(&semLogFile, 0, 1);
   sem_init(&semGetMemory, 0, 1);
@@ -100,14 +172,19 @@ int main(int argc, char * argv[]){
 
   /* Allocate memory for pthread_create() arguments */
   tinfo = calloc(num_threads, sizeof(struct thread_info));
+  printf("val: %lu\n", num_threads*sizeof(struct thread_info));
+  printf("val: %i\n", threads_size);
   if (tinfo == NULL) handle_error("calloc");
 
   /* Create one thread for each command-line argument */
-
-  for (tnum = 0; tnum < num_threads; tnum++) {
+  int secs;
+  tnum = 0;
+  //for (tnum = 0; tnum < num_threads; tnum++) {
+  while(1){
     tinfo[tnum].thread_num = tnum + 1;
     tinfo[tnum].timeWait = randint(2,6);
     tinfo[tnum].numPages = randint(5,10);
+    tinfo[tnum].stage = WTMEM1;
 
     /* The pthread_create() call stores the thread ID into
     corresponding element of tinfo[] */
@@ -115,6 +192,11 @@ int main(int argc, char * argv[]){
     s = pthread_create(&tinfo[tnum].thread_id, &attr, &thread_start, &tinfo[tnum]);
     if (s != 0)
     handle_error_en(s, "pthread_create");
+
+    secs = randint(5,10);
+    printf("Sleepin' %i secs.\n", secs);
+    sleep(randint(5,10));
+    tnum++;
   }
 
   /* Destroy the thread attributes object, since it is no
@@ -138,7 +220,7 @@ int main(int argc, char * argv[]){
 
   /* ========== DEVELOPMENT ONLY ========== */
 
-  //dumpMemory();
+  // dumpMemory();
 
   // Reset memory spaces
 	for (int i = 0; i < memory_size; i++) {
@@ -169,8 +251,9 @@ int main(int argc, char * argv[]){
   /* ======== END DEVELOPMENT ONLY ======== */
 
   shmdt(memory);
+  shmdt(threadPtrs);
   free(tinfo);
-  exit(EXIT_SUCCESS);
+  //exit(EXIT_SUCCESS);
 }
 
 /* PAGING HELPERS */
@@ -264,6 +347,18 @@ int releaseThreadShm(void *arg){
     exit(EXIT_FAILURE);
   }
   return 0;
+}
+
+int nextThreadPage(int tid, int pastPage){
+  int k;
+  if (pastPage != 0) pastPage++;
+  for (int i = pastPage; i < NUMPAGES; i++) {
+    k = getPageIndex(i);
+    if (memory[k] == tid) {
+      return i;
+    }
+  }
+  return -1;
 }
 
 void dumpMemory(){
