@@ -5,13 +5,12 @@
 
 // http://www.chuidiang.org/clinux/ipcs/mem_comp.php
 
-#include "api.h"
 #include "globals.h"
 
 void main(int argc, char *argv[]){
 
-	int memory_size, threads_size; // tamaño de bytes que deseamos para la memoria.
-	int memory_id, threads_id, sem_id; // identificador de la zona de memoria.
+	int memory_size; // tamaño de bytes que deseamos para la memoria.
+	int memory_id, sem_id; // identificador de la zona de memoria.
 	int *memory, *threadPtrs; // puntero a la zona de memoria.
 
     printf("╔═════════════════════════════════════╗\n");
@@ -21,10 +20,7 @@ void main(int argc, char *argv[]){
 	// pedir al usuario tamaño de memoria
 	/*printf(">> Enter memory size: ");
 	scanf("%d",&memory_size);*/
-	memory_size = MEMSIZE * UNITSIZE;
-
-	struct thread_info * ptrthi;
-	threads_size = LIMITPROCESSES * sizeof(pthread_t);
+	memory_size = sizeof(struct sharedMemory);
 
 	// Función int shmget (key_t, int, int).
 	// Creamos la memoria y nos devuelve un identificador para dicha zona.
@@ -46,22 +42,12 @@ void main(int argc, char *argv[]){
 		perror("shmat");
 		exit(1);
 	}
-
-	if ((threads_id = shmget(THREADS_KEY, threads_size, IPC_CREAT | RWPERM)) < 0) {
-		perror("shmget threads");
-		exit(1);
-	}
-
-	if ((threadPtrs = shmat(threads_id, NULL, 0)) == (int *) -1) {
-		perror("shmat threads");
-		exit(1);
-	}
 	
 	
 	createFile();
 	
 	
-	//	crear semaforos
+	// crear semaforos
     if((sem_id=semget(SEM_KEY,
             SEM_CANT,
             IPC_CREAT | 0700))<0) {
@@ -70,29 +56,17 @@ void main(int argc, char *argv[]){
     }
 
     // solo un proceso puede estar en la region critica
-    // se puede cambiar el 1, por la cantidad de procesos
-    // que pueden estar en RC
+    // se puede cambiar el 1, por la cantidad de procesos que pueden estar en RC
     initSem(sem_id,SEM_MEMORY,1);
     initSem(sem_id,SEM_FILE,1);
 
 
-	// Reset memory spaces
-	for (int i = 0; i < memory_size; i++) {
-		printf("%p: mem[%lu]=%i -> ", &memory[i], i/UNITSIZE, memory[i]);
-		memory[i] = -1;
-		printf("%i\n", memory[i]);
-	}
-
-	printf("memy: %p\n", memory);
-	printf("memz: %p\n", threadPtrs);
-
 
 	printf("memory_id: %d with key: %i\n",memory_id, MEMORY_KEY);
 
-	printf("threadPtrs: %d with key: %i\n",threads_id, THREADS_KEY);
 	printf("semaphores: %d with key: %i\n",sem_id, SEM_KEY);
 	
 	shmdt(memory);
-	shmdt(threadPtrs);
+
 
 }

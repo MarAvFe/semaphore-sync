@@ -8,8 +8,19 @@
 #include <semaphore.h>
 #include <sys/shm.h>
 #include <errno.h>
+#include <wait.h>
+#include <unistd.h>
+#include <time.h>
+#include <sys/stat.h>
+#include <sys/sem.h>
 
 #define MEMORY_KEY ftok("actions.log",1337)
+#define MEMORY_KEY ftok("actions.log",1337)
+#define THREADS_KEY MEMORY_KEY+1 //ftok("tmp.log",1337)
+#define SEM_KEY THREADS_KEY+1
+#define SEM_CANT 2
+#define SEM_MEMORY 0
+#define SEM_FILE 1  
 #define MEMSIZE 512
 #define RWPERM 0666
 
@@ -24,6 +35,17 @@
 #define RLSSPC 7 // Release mem space
 #define WRTLG2 8 // Write in log 2
 #define GVMEM2 9 // Give back mem semaphore
+
+FILE *logFile, *memFile;
+char * ptrLogFile, * ptrMemFile;
+int schema, tidGettingMemory;
+
+int randint(int,int);
+void createFile();
+void writeIntoFile(char*);
+void writeIntIntoFile(int);
+void readFromFile();
+
 
 struct thread_info {          /* Used as argument to thread_start() */
   pthread_t thread_id;        /* ID returned by pthread_create() */
@@ -43,3 +65,66 @@ struct sharedMemory {
   struct thread_info threads[MEMSIZE];
   int semaphores[2];
 };
+
+
+// funciones auxiliares
+
+int randint(int l, int h){
+  return l + rand() % (h - l);
+}
+
+void createFile(){
+  printf("Creating logFile %s...\n", ptrLogFile);
+  unsigned char buffer[0] = "";
+  logFile = fopen(ptrLogFile, "w");
+
+  if (logFile != NULL){
+    fprintf(logFile, "%s", buffer);
+  }
+  fclose(logFile);
+}
+
+void writeIntoFile(char * buf){
+  //printf("Writing \"%s\" into logFile %s...\n", buf, ptrLogFile);
+
+  // critical section here
+  logFile = fopen(ptrLogFile, "a");
+
+  if (logFile != NULL){
+    fprintf(logFile, "%s", buf);
+  }
+  fclose(logFile);
+}
+
+void writeIntIntoFile(int buf){
+  // critical section here
+  //printf("Writing \"%i\" into logFile %s...\n", buf, ptrLogFile);
+  logFile = fopen(ptrLogFile, "a");
+
+  if (logFile != NULL){
+    fprintf(logFile, "%i", buf);
+  }
+  fclose(logFile);
+}
+
+void readFromFile(){
+  //printf("Reading from logFile %s...\n", ptrLogFile);
+  size_t bytesRead = 0;
+  logFile = fopen(ptrLogFile, "r");
+  char buffer[255];
+  int nums[255];
+  int numInd = 0;
+  char * tmpNum, *bufPtr = buffer;
+  if (logFile != NULL){
+    while ((bytesRead = fread(buffer, 1, sizeof(buffer), logFile)) > 0){
+      // printf("Read: %s\n", buffer);
+      while ((tmpNum = strsep(&bufPtr, " ")) != NULL){ // Separa los numeros leidos por espacio
+        nums[numInd] = atoi(tmpNum);
+        printf("gotNum: %i\n", nums[numInd]);
+        numInd++;
+      }
+    }
+  }
+  fclose(logFile);
+};
+
