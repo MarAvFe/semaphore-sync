@@ -8,7 +8,7 @@ void main(int argc, char *argv[]){
 	struct sharedMemory *pEmptyMemory;
 
     printf("╔═════════════════════════════════════╗\n");
-    printf("║.............INITIALIZER.............║\n");
+    printf("║             INITIALIZER             ║\n");
     printf("╚═════════════════════════════════════╝\n");
 
 	// pedir al usuario tamaño de memoria
@@ -28,9 +28,9 @@ void main(int argc, char *argv[]){
 
 	pEmptyMemory = calloc(1, sizeof(struct sharedMemory));
 
-	pEmptyMemory[0].fragment = calloc(MEMSIZE, sizeof(struct segPage));
-	pEmptyMemory[0].threads = calloc(MEMSIZE, sizeof(struct thread_info));
-	pEmptyMemory[0].semaphores = calloc(2, sizeof(int));
+	pEmptyMemory[0].fragment = malloc(MEMSIZE * sizeof(struct segPage));
+	pEmptyMemory[0].threads = malloc(MEMSIZE * sizeof(struct thread_info));
+	pEmptyMemory[0].semaphores = malloc(2 * sizeof(int));
 
 	// Reset memory spaces
 	/*for (int i = 0; i < memory_size; i++) {

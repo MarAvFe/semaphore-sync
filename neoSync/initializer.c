@@ -1,23 +1,17 @@
-// Pide los recursos y los inicializa de manera que los actores encuentren todo listo en el momento de empezar a funcionar.
-// Pide la cantidad de páginas o espacios de memoria que va a haber.
-// Solicita la memoria compartida al sistema operativo.
-// Este proceso debe morir después de realizar la inicialización.
-
-// http://www.chuidiang.org/clinux/ipcs/mem_comp.php
-
 #include "globals.h"
 
 
-void main(int argc, char *argv[]){
-	
+int main(int argc, char *argv[]){
+
 	ptrLogFile = "actions.log";
 	int memory_size; // tamaño de bytes que deseamos para la memoria.
-	int memory_id, sem_id; // identificador de la zona de memoria.
-	int *memory, *threadPtrs; // puntero a la zona de memoria.
+	int memory_id; // identificador de la zona de memoria.
+	struct sharedMemory *memory; // puntero a la zona de memoria.
+	long unsigned sid;
 
-    printf("╔═════════════════════════════════════╗\n");
-    printf("║.............INITIALIZER.............║\n");
-    printf("╚═════════════════════════════════════╝\n");
+	printf("╔═════════════════════════════════════╗\n");
+	printf("║             INITIALIZER             ║\n");
+	printf("╚═════════════════════════════════════╝\n");
 
 	// pedir al usuario tamaño de memoria
 	/*printf(">> Enter memory size: ");
@@ -40,35 +34,44 @@ void main(int argc, char *argv[]){
 	// El primer parámetro es el identificador de la memoria obtenido en el paso anterior.
 	// El puntero devuelto es de tipo char *. Debemos hacerle un "cast" al tipo que queramos.
 
-	if ((memory = shmat(memory_id, NULL, 0)) == (int *) -1) {
+	if ((memory = shmat(memory_id, NULL, 0)) == (struct sharedMemory *) -1) {
 		perror("shmat");
 		exit(1);
 	}
-	
-	
+
 	createFile();
-	
-	
-	// crear semaforos
-    if((sem_id=semget(SEM_KEY,
-            SEM_CANT,
-            IPC_CREAT | 0700))<0) {
-        perror(NULL);
-        error("Sem: semget");
-    }
 
-    // solo un proceso puede estar en la region critica
-    // se puede cambiar el 1, por la cantidad de procesos que pueden estar en RC
-    initSem(sem_id,SEM_MEMORY,1);
-    initSem(sem_id,SEM_FILE,1);
+	memory = malloc(sizeof(struct sharedMemory));
+	memset(memory, -1, sizeof(struct sharedMemory));
 
 
+
+	if((sid=semget(SEM_KEY, SEM_CANT, IPC_CREAT | RWPERM))<0) {
+		perror("semget");
+	}
+	printf("sid: %lu\n", sid);
+
+	if (semctl(sid, SEM_MEMORY, SETVAL, 1) < 0) {
+		perror("semctl");
+	}
+
+	if (semctl(sid, SEM_FILE, SETVAL, 1) < 0) {
+		perror("semctl");
+	}
+
+	memory->semaphore = sid;
+
+	//sem_init(&(memory->semaphores[0]), 0, 0);
+	//sem_init(&memory->semaphores[1], 0, 0);
+
+	printf("Memy addr: %p\n", &memory);
+
+	//memory->semaphores[0] = sem_id;
 
 	printf("memory_id: %d with key: %i\n",memory_id, MEMORY_KEY);
+	//printf("semaphores: %d with key: %i\n",sem_id, SEM_KEY);
 
-	printf("semaphores: %d with key: %i\n",sem_id, SEM_KEY);
-	
 	shmdt(memory);
 
-
+	exit(EXIT_SUCCESS);
 }

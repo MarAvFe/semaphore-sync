@@ -13,14 +13,14 @@
 #include <time.h>
 #include <sys/stat.h>
 #include <sys/sem.h>
+#include <sys/syscall.h>
 
-#define MEMORY_KEY ftok("actions.log",1337)
 #define MEMORY_KEY ftok("actions.log",1337)
 #define THREADS_KEY MEMORY_KEY+1 //ftok("tmp.log",1337)
 #define SEM_KEY THREADS_KEY+1
 #define SEM_CANT 2
 #define SEM_MEMORY 0
-#define SEM_FILE 1  
+#define SEM_FILE 1
 #define MEMSIZE 512
 #define RWPERM 0666
 
@@ -63,7 +63,7 @@ struct segPage {
 struct sharedMemory {
   struct segPage fragment[MEMSIZE];
   struct thread_info threads[MEMSIZE];
-  int semaphores[2];
+  int semaphore;
 };
 
 
@@ -130,9 +130,8 @@ void readFromFile(){
 
 
 void initSem(int semid, int numSem, int value) { //iniciar un semaforo
-  
-    if (semctl(semid, numSem, SETVAL, value) < 0) {        
+    if (semctl(semid, numSem, SETVAL, value) < 0) {
     perror(NULL);
-        error("Sem: init error");
+        perror("Sem: init error");
     }
 };
