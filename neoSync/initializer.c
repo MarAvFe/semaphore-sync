@@ -1,4 +1,3 @@
-// Programa Inicializador: Este programa se encarga de crear el ambiente.
 // Pide los recursos y los inicializa de manera que los actores encuentren todo listo en el momento de empezar a funcionar.
 // Pide la cantidad de páginas o espacios de memoria que va a haber.
 // Solicita la memoria compartida al sistema operativo.
@@ -7,6 +6,7 @@
 // http://www.chuidiang.org/clinux/ipcs/mem_comp.php
 
 #include "api.h"
+#include "globals.h"
 
 void main(int argc, char *argv[]){
 
@@ -28,9 +28,6 @@ void main(int argc, char *argv[]){
 
 	// Función int shmget (key_t, int, int).
 	// Creamos la memoria y nos devuelve un identificador para dicha zona.
-	// Si la zona de memoria correspondiente a MEMORY_KEY ya estuviera creada, simplemente nos daría el identificdor de la memoria.
-	// El primer parámetro es la clave MEMORY_KEY debería ser la misma para todos los programas.
-	// El segundo parámetro es memory_size.
 	// El tercer parámetro son permisos de lectura/escritura/ejecución para propietario/grupo/otros, al igual que los ficheros.
 	// IPC_CREAT indica si se debe crear la memoria en caso de que no exista.
 
@@ -61,13 +58,23 @@ void main(int argc, char *argv[]){
 	}
 	
 	
-	//Creamos un semaforo y damos permisos para compartirlo
+	createFile();
+	
+	
+	//	crear semaforos
     if((sem_id=semget(SEM_KEY,
             SEM_CANT,
             IPC_CREAT | 0700))<0) {
         perror(NULL);
         error("Sem: semget");
     }
+
+    // solo un proceso puede estar en la region critica
+    // se puede cambiar el 1, por la cantidad de procesos
+    // que pueden estar en RC
+    initSem(sem_id,SEM_MEMORY,1);
+    initSem(sem_id,SEM_FILE,1);
+
 
 	// Reset memory spaces
 	for (int i = 0; i < memory_size; i++) {
@@ -83,6 +90,9 @@ void main(int argc, char *argv[]){
 	printf("memory_id: %d with key: %i\n",memory_id, MEMORY_KEY);
 
 	printf("threadPtrs: %d with key: %i\n",threads_id, THREADS_KEY);
+	printf("semaphores: %d with key: %i\n",sem_id, SEM_KEY);
+	
 	shmdt(memory);
 	shmdt(threadPtrs);
+
 }

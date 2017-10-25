@@ -8,13 +8,19 @@
 #include <semaphore.h>
 #include <sys/shm.h>
 #include <errno.h>
+#include <signal.h>
 /*
 #include <sys/stat.h>
 #include <wait.h>
 #include <unistd.h>*/
 
+
 #define MEMORY_KEY ftok("actions.log",1337)
 #define THREADS_KEY MEMORY_KEY+1 //ftok("tmp.log",1337)
+#define SEM_KEY THREADS_KEY+1
+#define SEM_CANT 2
+#define SEM_MEMORY 0
+#define SEM_FILE 1  
 #define MEMSIZE 512
 #define RWPERM 0666
 #define UNITSIZE sizeof(int)
