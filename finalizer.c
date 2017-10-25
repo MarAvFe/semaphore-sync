@@ -2,12 +2,11 @@
 
 main(){
 
-	int memory_size, threads_size; // tamaño de bytes que deseamos para la memoria.
-	int memory_id, threads_id; // identificador de la zona de memoria.
-	int *memory, *threadPtrs; // puntero a la zona de memoria.
+	int memory_id, threads_id; 
+	int *memory;
 
 
-	if ((memory_id = shmget(MEMORY_KEY, memory_size, IPC_CREAT | RWPERM)) < 0) {
+	if ((memory_id = shmget(MEMORY_KEY, MEMSIZE, IPC_CREAT | RWPERM)) < 0) {
 		perror("shmget");
 		exit(1);
 	}

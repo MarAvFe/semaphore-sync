@@ -13,7 +13,9 @@
 #include <time.h>
 #include <sys/stat.h>
 #include <sys/sem.h>
-#include <sys/syscall.h>
+#include <signal.h>
+
+
 
 #define MEMORY_KEY ftok("actions.log",1337)
 #define THREADS_KEY MEMORY_KEY+1 //ftok("tmp.log",1337)
@@ -63,7 +65,7 @@ struct segPage {
 struct sharedMemory {
   struct segPage fragment[MEMSIZE];
   struct thread_info threads[MEMSIZE];
-  int semaphore;
+  int semaphores[2];
 };
 
 
@@ -135,3 +137,26 @@ void initSem(int semid, int numSem, int value) { //iniciar un semaforo
         perror("Sem: init error");
     }
 };
+
+void getSource(int sem_id, int sem_num) {
+    struct sembuf sops;
+    sops.sem_num = sem_num; 
+    sops.sem_op = -1;
+    sops.sem_flg = 0;
+ 
+    if (semop(sem_id, &sops, 1) == -1) {
+        perror(NULL);
+    }
+};
+
+void releaseSource(int sem_id, int sem_num) {
+    struct sembuf sops; 
+    sops.sem_num = sem_num;
+    sops.sem_op = 1;
+    sops.sem_flg = 0;
+ 
+    if (semop(sem_id, &sops, 1) == -1) {
+        perror(NULL);
+    }
+};
+
