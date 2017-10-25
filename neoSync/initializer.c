@@ -10,11 +10,16 @@
 
 void main(int argc, char *argv[]){
 	
+	
+	
 	ptrLogFile = "actions.log";
 	int memory_size; // tamaño de bytes que deseamos para la memoria.
 	int memory_id, sem_id; // identificador de la zona de memoria.
-	int *memory, *threadPtrs; // puntero a la zona de memoria.
+	//int *memory, *threadPtrs; // puntero a la zona de memoria.
+	struct sharedMemory * memory;
 
+
+		
     printf("╔═════════════════════════════════════╗\n");
     printf("║.............INITIALIZER.............║\n");
     printf("╚═════════════════════════════════════╝\n");
@@ -40,10 +45,11 @@ void main(int argc, char *argv[]){
 	// El primer parámetro es el identificador de la memoria obtenido en el paso anterior.
 	// El puntero devuelto es de tipo char *. Debemos hacerle un "cast" al tipo que queramos.
 
-	if ((memory = shmat(memory_id, NULL, 0)) == (int *) -1) {
+	if ((memory = shmat(memory_id, NULL, 0)) == NULL) {
 		perror("shmat");
 		exit(1);
 	}
+	
 	
 	
 	createFile();
@@ -54,7 +60,7 @@ void main(int argc, char *argv[]){
             SEM_CANT,
             IPC_CREAT | 0700))<0) {
         perror(NULL);
-        error("Sem: semget");
+
     }
 
     // solo un proceso puede estar en la region critica
@@ -62,11 +68,15 @@ void main(int argc, char *argv[]){
     initSem(sem_id,SEM_MEMORY,1);
     initSem(sem_id,SEM_FILE,1);
 
+	
+	// iniciar structs en -1 	
+	memory = malloc(sizeof(struct sharedMemory));
+	memset(memory, -1, sizeof(struct sharedMemory));
+
 
 
 	printf("memory_id: %d with key: %i\n",memory_id, MEMORY_KEY);
-
-	printf("semaphores: %d with key: %i\n",sem_id, SEM_KEY);
+	printf("sem_id: %d with key: %i\n",sem_id, SEM_KEY);
 	
 	shmdt(memory);
 
