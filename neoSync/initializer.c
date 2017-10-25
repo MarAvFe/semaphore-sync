@@ -7,8 +7,10 @@
 
 #include "globals.h"
 
-void main(int argc, char *argv[]){
 
+void main(int argc, char *argv[]){
+	
+	ptrLogFile = "actions.log";
 	int memory_size; // tamaño de bytes que deseamos para la memoria.
 	int memory_id, sem_id; // identificador de la zona de memoria.
 	int *memory, *threadPtrs; // puntero a la zona de memoria.
