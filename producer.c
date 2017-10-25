@@ -187,7 +187,7 @@ int main(int argc, char * argv[]){
     tinfo[tnum].stage = WTMEM1;
 
     /* The pthread_create() call stores the thread ID into
-    corresponding element of tinfo[] */
+    corresponding element of tinfo[] */f
 
     s = pthread_create(&tinfo[tnum].thread_id, &attr, &thread_start, &tinfo[tnum]);
     if (s != 0)
