@@ -128,3 +128,11 @@ void readFromFile(){
   fclose(logFile);
 };
 
+
+void initSem(int semid, int numSem, int value) { //iniciar un semaforo
+  
+    if (semctl(semid, numSem, SETVAL, value) < 0) {        
+    perror(NULL);
+        error("Sem: init error");
+    }
+};
