@@ -1,4 +1,17 @@
+#include <time.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/sem.h>
+#include <semaphore.h>
+#include <sys/shm.h>
+#include <errno.h>
+
+#define MEMORY_KEY ftok("actions.log",1337)
 #define MEMSIZE 512
+#define RWPERM 0666
 
 #define DED   -1 // Couldn't create. Died instead
 #define FNSHED 0 // Finished
