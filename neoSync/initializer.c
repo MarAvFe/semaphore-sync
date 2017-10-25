@@ -2,21 +2,11 @@
 
 
 int main(int argc, char *argv[]){
-
-<<<<<<<
-
-=======
-
-void main(int argc, char *argv[]){
-	
-	
-	
->>>>>>>
 	ptrLogFile = "actions.log";
 	int memory_size; // tamaño de bytes que deseamos para la memoria.
 	int memory_id; // identificador de la zona de memoria.
 	struct sharedMemory *memory; // puntero a la zona de memoria.
-	long unsigned sid;
+	int sid;
 
 	printf("╔═════════════════════════════════════╗\n");
 	printf("║             INITIALIZER             ║\n");
@@ -50,19 +40,10 @@ void main(int argc, char *argv[]){
 
 	createFile();
 
-	memory = malloc(sizeof(struct sharedMemory));
-	memset(memory, -1, sizeof(struct sharedMemory));
-
-	
-	// iniciar structs en -1 	
-	memory = malloc(sizeof(struct sharedMemory));
-	memset(memory, -1, sizeof(struct sharedMemory));
-
-
 	if((sid=semget(SEM_KEY, SEM_CANT, IPC_CREAT | RWPERM))<0) {
 		perror("semget");
 	}
-	printf("sid: %lu\n", sid);
+	printf("sid: %i\n", sid);
 
 	if (semctl(sid, SEM_MEMORY, SETVAL, 1) < 0) {
 		perror("semctl");
@@ -72,18 +53,15 @@ void main(int argc, char *argv[]){
 		perror("semctl");
 	}
 
-	memory->semaphore = sid;
-
-	//sem_init(&(memory->semaphores[0]), 0, 0);
-	//sem_init(&memory->semaphores[1], 0, 0);
+	memory[0].semaphore = sid;
 
 	printf("Memy addr: %p\n", &memory);
 
 	//memory->semaphores[0] = sem_id;
 
 	printf("memory_id: %d with key: %i\n",memory_id, MEMORY_KEY);
-	printf("sem_id: %d with key: %i\n",sem_id, SEM_KEY);
-	
+	printf("sem_id: %d with key: %i\n",sid, SEM_KEY);
+
 	shmdt(memory);
 
 	exit(EXIT_SUCCESS);

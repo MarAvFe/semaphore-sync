@@ -65,7 +65,7 @@ struct segPage {
 struct sharedMemory {
   struct segPage fragment[MEMSIZE];
   struct thread_info threads[MEMSIZE];
-  int semaphores[2];
+  int semaphore;
 };
 
 
@@ -140,23 +140,22 @@ void initSem(int semid, int numSem, int value) { //iniciar un semaforo
 
 void getSource(int sem_id, int sem_num) {
     struct sembuf sops;
-    sops.sem_num = sem_num; 
+    sops.sem_num = sem_num;
     sops.sem_op = -1;
     sops.sem_flg = 0;
- 
+
     if (semop(sem_id, &sops, 1) == -1) {
         perror(NULL);
     }
 };
 
 void releaseSource(int sem_id, int sem_num) {
-    struct sembuf sops; 
+    struct sembuf sops;
     sops.sem_num = sem_num;
     sops.sem_op = 1;
     sops.sem_flg = 0;
- 
+
     if (semop(sem_id, &sops, 1) == -1) {
         perror(NULL);
     }
 };
-
