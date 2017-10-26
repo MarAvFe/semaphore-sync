@@ -49,7 +49,7 @@ static void * thread_start(void *arg){
   p(semGetMemory, SEM_MEMORY);
 
   tinfo->thread_id = pthread_self();
-  
+
   tidGettingMemory = tinfo->thread_num;
   tinfo->stage = SCHSPC;
   int alloc = allocateThreadShm(arg);
@@ -191,13 +191,13 @@ int main(int argc, char * argv[]){
 
     /* The pthread_create() call stores the thread ID into
     corresponding element of tinfo[] */
-	
+
     s = pthread_create(&tinfo[tnum].thread_id, &attr, &thread_start, &tinfo[tnum]);
     if (s != 0)
     handle_error_en(s, "pthread_create");
 
 
-    memory[0].threads[threadIndex++] = tinfo[tnum];
+    memory[0].threads[(threadIndex++)%MEMSIZE] = tinfo[tnum];
     //secs = randint(5,10);
     //printf("Sleepin' %i secs.\n", secs);
     sleep(2);
