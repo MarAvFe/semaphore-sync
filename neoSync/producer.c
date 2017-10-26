@@ -18,6 +18,7 @@ do { perror(msg); exit(EXIT_FAILURE); } while (0)
 int semLogFile, semGetMemory;
 int memory_id, memory_size;
 struct sharedMemory * memory;
+int threadIndex = 0;
 
 int getPageIndex();
 int getEmptyPage();
@@ -29,7 +30,8 @@ void setPageTableRow(int, int);
 int allocateThreadShm(void *);
 int releaseThreadShm(void *);
 int nextThreadPage(int, int);
-int getSegmentStart(int);
+int getNewSegmentStart(int);
+int getSegmentStart(int, int);
 int enoughSpace(int,int);
 void dumpMemory();
 void p();
@@ -46,6 +48,8 @@ static void * thread_start(void *arg){
 
   p(semGetMemory, SEM_MEMORY);
 
+  tinfo->thread_id = pthread_self();
+  
   tidGettingMemory = tinfo->thread_num;
   tinfo->stage = SCHSPC;
   int alloc = allocateThreadShm(arg);
@@ -62,7 +66,7 @@ static void * thread_start(void *arg){
   if (schema == PAGINATION) {
     writeIntoFile(", pages: [");
     int pastPage = 0;
-    /*for (int i = 0; i < tinfo->numPages; i++) {
+    for (int i = 0; i < tinfo->numPages; i++) {
       pastPage = nextThreadPage(tinfo->thread_num, pastPage);
       if (pastPage < 0) break;
       if (pastPage == 0) pastPage++;
@@ -71,8 +75,15 @@ static void * thread_start(void *arg){
       writeIntoFile(",");
       writeIntIntoFile(pastPage);
       writeIntoFile("), ");
-    }*/
+    }
     writeIntoFile("]");
+  }
+  if (schema == SEGMENTATION) {
+    writeIntoFile(", start: ");
+    int start = getSegmentStart(tinfo->thread_num, tinfo->numPages);
+    writeIntIntoFile(start);
+    writeIntoFile(", lenght: ");
+    writeIntIntoFile(tinfo->numPages);
   }
   writeIntoFile("\n");
   v(semLogFile, SEM_FILE);
@@ -105,7 +116,7 @@ static void * thread_start(void *arg){
   if (schema == PAGINATION) {
     writeIntoFile(", pages: [");
     int pastPage = 0;
-    /*for (int i = 0; i < tinfo->numPages; i++) {
+    for (int i = 0; i < tinfo->numPages; i++) {
       pastPage = nextThreadPage(tinfo->thread_num, pastPage);
       if (pastPage < 0) break;
       if (pastPage == 0) pastPage++;
@@ -114,7 +125,7 @@ static void * thread_start(void *arg){
       writeIntoFile(",");
       writeIntIntoFile(pastPage);
       writeIntoFile("), ");
-    }*/
+    }
     writeIntoFile("]");
   }
   writeIntoFile("\n");
@@ -166,16 +177,15 @@ int main(int argc, char * argv[]){
 
   /* Allocate memory for pthread_create() arguments */
   tinfo = calloc(num_threads, sizeof(struct thread_info));
-  printf("val: %lu\n", num_threads*sizeof(struct thread_info));
   if (tinfo == NULL) handle_error("calloc");
 
   /* Create one thread for each command-line argument */
   int secs;
   tnum = 0;
-  for (tnum = 0; tnum < num_threads; tnum++) {
-    //while(1){
+  //for (tnum = 0; tnum < num_threads; tnum++) {
+  while(1){
     tinfo[tnum].thread_num = tnum + 1;
-    tinfo[tnum].timeWait = randint(2,6);
+    tinfo[tnum].timeWait = randint(3,8);
     tinfo[tnum].numPages = randint(5,10);
     tinfo[tnum].stage = WTMEM1;
 
@@ -186,9 +196,11 @@ int main(int argc, char * argv[]){
     if (s != 0)
     handle_error_en(s, "pthread_create");
 
-    secs = randint(5,10);
+
+    memory[0].threads[threadIndex++] = tinfo[tnum];
+    //secs = randint(5,10);
     //printf("Sleepin' %i secs.\n", secs);
-    //sleep(randint(5,10));
+    sleep(2);
     tnum++;
   }
 
@@ -220,15 +232,12 @@ int main(int argc, char * argv[]){
   //printf("emptyPage: %i\n", getEmptyPage());
   //writePage(0,3,1);
   //writePage(1,3,2);
-  dumpMemory();
-  writePage(2,3,3);
-  dumpMemory();
   //printf("resSpc: %i\n", enoughSpace(0,3));
   //printf("resSpc: %i\n", enoughSpace(1,3));
   //printf("resSpc: %i\n", enoughSpace(0,2));
-  //printf("res: %i\n", getSegmentStart(2));
-  //printf("res: %i\n", getSegmentStart(3));
-  //printf("res: %i\n", getSegmentStart(4));
+  //printf("res: %i\n", getNewSegmentStart(2));
+  //printf("res: %i\n", getNewSegmentStart(3));
+  //printf("res: %i\n", getNewSegmentStart(4));
   //printf("totEmptyPages: %i\n", getTotalEmptyPages());
   //printf("emptyPage: %i\n", getEmptyPage());
   //resetPage(1);
@@ -310,7 +319,7 @@ void resetPage(int pageNum){
 
 int allocateThreadShm(void *arg){
   struct thread_info *tinfo = arg;
-  printf("Allocating %i pages from tid: %i.\n", tinfo->numPages, tinfo->thread_num);
+  //fprintf("Allocating %i pages from tid: %i.\n", tinfo->numPages, tinfo->thread_num);
   if (schema == PAGINATION) {
     int empPag = getTotalEmptyPages(), ep;
     if (empPag < tinfo->numPages) return -1;
@@ -321,7 +330,7 @@ int allocateThreadShm(void *arg){
     }
   }else{
     int empPag = getTotalEmptyPages();
-    int segStart = getSegmentStart(tinfo->numPages);
+    int segStart = getNewSegmentStart(tinfo->numPages);
     if (segStart == -1) return -1;
     for (int i = 0; i < tinfo->numPages; i++) {
       writePage(segStart + i, tinfo->thread_num, i+1);
@@ -340,8 +349,11 @@ int releaseThreadShm(void *arg){
       writePage(getProcessPage(tinfo->thread_num), -1, -1);
     }
   }else{
-    printf("SEGMENTATION NOT IMPLEMENTED. QUITTING.\n");
-    exit(EXIT_FAILURE);
+    int segStart = getSegmentStart(tinfo->thread_num, tinfo->numPages);
+    if (segStart == -1) return -1;
+    for (int i = 0; i < tinfo->numPages; i++) {
+      writePage(segStart + i, -1, -1);
+    }
   }
   return 0;
 }
@@ -356,11 +368,10 @@ int nextThreadPage(int tid, int pastPage){
   return -1;
 }
 
-int getSegmentStart(int size){
+int getNewSegmentStart(int size){
   int crash = 0;
   for (int i = 0; i < NUMPAGES-size; i++) {
     if (memory[0].fragment[i].processNum == -1) {
-      printf("calling eSpc: %i pages since page %i\n", size, i);
       crash = enoughSpace(i, size);
       if (crash == 0) return i;
       crash = 0;
@@ -369,9 +380,18 @@ int getSegmentStart(int size){
   return -1;
 }
 
+int getSegmentStart(int tid, int size){
+  int crash = 0;
+  for (int i = 0; i < NUMPAGES-size; i++) {
+    if (memory[0].fragment[i].processNum == tid) {
+      return i;
+    }
+  }
+  return -1;
+}
+
 int enoughSpace(int page, int size){
   int crash = 0;
-  printf("spc: %i in %i?\n", size, page);
   for (int i = page; i < page+size; i++) {
     if (memory[0].fragment[i].processNum != -1) {
       return 1;

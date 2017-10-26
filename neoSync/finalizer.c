@@ -29,16 +29,16 @@ int main(){
 	pthread_t thread_id;
 
 	// probar
-	for( thr = 0; thr < MEMSIZE; thr = thr + 1 ){
-		if(memory->threads[thr].thread_id != 0){
+	for( thr = 0; thr < MEMSIZE; thr++ ){
+		if(memory[0].threads[thr].thread_id != 0){
 
-			thread_id = memory->threads[thr].thread_id;
-			//printf("thread_id: %lu\n cont: %d", (unsigned long) thread_id, thr);
+			thread_id = memory[0].threads[thr].thread_id;
+			printf("thread_id: %lu\n cont: %d", (unsigned long) thread_id, thr);
 
 			if(thread_id != 0){
 
 				pthread_kill(thread_id,SIGKILL);
-				//printf("Thread killed id: %lu\n", (unsigned long) thread_id);
+				printf("Thread killed id: %lu\n", (unsigned long) thread_id);
 			}
 		}
 	}

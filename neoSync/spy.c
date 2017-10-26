@@ -46,16 +46,18 @@ void dumpMemory(){
   printf("  MEM\n");
   for (i = 0; i < MEMSIZE; i++) {
     if(memory[0].fragment[i].processNum != -1) {
-      printf("(%i,%i),", memory[0].fragment[i].processNum, memory[0].fragment[i].numLogicPage);
-      if (k % 10 == 9) printf("\n");
+      printf("p%i(%i,%i),", i, memory[0].fragment[i].processNum, memory[0].fragment[i].numLogicPage);
+      if (k % 5 == 4) printf("\n");
       k++;
     }
   }
   printf("\n%i Pages written.", k);
-  printf("\n  THREADS: PENDING:");
-  /*for (int i = 0; i < MEMSIZE; i++) {
-    printf("%i, ", memory[0].threads[i].thread_num);
-  }*/
+  printf("\n  THREADS: id|status:");
+  for (int i = 0; i < MEMSIZE; i++) {
+		if(memory[0].threads[i].thread_num != -1) {
+    	printf("%lu|%i, ", memory[0].threads[i].thread_id, memory[0].threads[i].stage);
+		}
+  }
   printf("\n  SEMID: %i\n", memory[0].semaphore);
 
   printf("\n");
