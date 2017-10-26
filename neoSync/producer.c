@@ -178,6 +178,8 @@ int main(int argc, char * argv[]){
   /* Create one thread for each command-line argument */
   int secs;
   tnum = 0;
+  int meminx = 0;
+  
   for (tnum = 0; tnum < num_threads; tnum++) {
     //while(1){
     tinfo[tnum].thread_num = tnum + 1;
@@ -187,11 +189,28 @@ int main(int argc, char * argv[]){
 
     /* The pthread_create() call stores the thread ID into
     corresponding element of tinfo[] */
-
+	
     s = pthread_create(&tinfo[tnum].thread_id, &attr, &thread_start, &tinfo[tnum]);
     if (s != 0)
     handle_error_en(s, "pthread_create");
-
+	
+	printf("bef - tinfo thread_id: %lu\n", (unsigned long) tinfo[tnum].thread_id);
+	// AQUI
+	
+	for (meminx = 0; meminx < MEMSIZE; meminx++){
+		if(memory[0].threads[meminx].thread_id == 0){
+			printf("meminx: %i\n", meminx);
+			memory[0].threads[meminx] = tinfo[tnum];
+			//memory[0].threads[meminx].thread_num = tinfo[tnum].thread_num;
+			//memory[0].threads[meminx].timeWait = tinfo[tnum].timeWait;
+			//memory[0].threads[meminx].numPages = tinfo[tnum].numPages;
+			//memory[0].threads[meminx].stage = tinfo[tnum].stage;
+			printf("tinfo thread_id: %lu\n", (unsigned long) memory[0].threads[meminx].thread_id);
+			printf("tinfo timewait: %d\n", (int) memory[0].threads[meminx].timeWait);
+			break;
+		}
+	}
+	
     secs = randint(5,10);
     //printf("Sleepin' %i secs.\n", secs);
     //sleep(randint(5,10));
