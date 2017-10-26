@@ -191,7 +191,7 @@ int main(int argc, char * argv[]){
 
     /* The pthread_create() call stores the thread ID into
     corresponding element of tinfo[] */
-
+	
     s = pthread_create(&tinfo[tnum].thread_id, &attr, &thread_start, &tinfo[tnum]);
     if (s != 0)
     handle_error_en(s, "pthread_create");
