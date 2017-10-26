@@ -53,6 +53,7 @@ int main(int argc, char *argv[]){
 		perror("semctl");
 	}
 
+	memset(memory, -1, sizeof(struct sharedMemory));
 	memory[0].semaphore = sid;
 
 	printf("Memy addr: %p\n", &memory);

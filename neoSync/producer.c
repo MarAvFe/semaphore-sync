@@ -29,6 +29,8 @@ void setPageTableRow(int, int);
 int allocateThreadShm(void *);
 int releaseThreadShm(void *);
 int nextThreadPage(int, int);
+int getSegmentStart(int);
+int enoughSpace(int,int);
 void dumpMemory();
 void p();
 void v();
@@ -43,14 +45,12 @@ static void * thread_start(void *arg){
   struct tm* tm_info;
 
   p(semGetMemory, SEM_MEMORY);
-  //sem_wait(semGetMemory);
 
   tidGettingMemory = tinfo->thread_num;
   tinfo->stage = SCHSPC;
-  int alloc = 0;//allocateThreadShm(arg);
+  int alloc = allocateThreadShm(arg);
 
   p(semLogFile, SEM_FILE);
-  //sem_wait(semLogFile);
   time(&timer);
   tm_info = localtime(&timer);
   strftime(buffer, 26, "%H:%M:%S", tm_info);
@@ -76,11 +76,9 @@ static void * thread_start(void *arg){
   }
   writeIntoFile("\n");
   v(semLogFile, SEM_FILE);
-  //sem_post(semGetMemory);
 
   tinfo->stage = GVMEM1;
   v(semGetMemory, SEM_MEMORY);
-  //sem_post(semGetMemory);
 
   if (alloc != 0){
     printf("DEEEEEEED: %i\n", tinfo->thread_num);
@@ -95,10 +93,8 @@ static void * thread_start(void *arg){
 
   tinfo->stage = WTMEM2;
   p(semGetMemory, SEM_MEMORY);
-  //sem_wait(semGetMemory);
 
   p(semLogFile, SEM_FILE);
-  //sem_wait(semLogFile);
   time(&timer);
   tm_info = localtime(&timer);
   strftime(buffer, 26, "%H:%M:%S", tm_info);
@@ -122,14 +118,12 @@ static void * thread_start(void *arg){
     writeIntoFile("]");
   }
   writeIntoFile("\n");
-  //sem_post(semLogFile);
   v(semLogFile, SEM_FILE);
 
   tinfo->stage = RLSSPC;
-  //releaseThreadShm(arg);
+  releaseThreadShm(arg);
 
   tinfo->stage = GVMEM2;
-  //sem_post(semGetMemory);
   v(semGetMemory, SEM_MEMORY);
 
   tinfo->stage = FNSHED;
@@ -145,7 +139,7 @@ int main(int argc, char * argv[]){
   ptrLogFile = "actions.log";
   num_threads = randint(3,14);
   memory_size = sizeof(struct sharedMemory);
-  schema = PAGINATION;
+  schema = SEGMENTATION;
 
   createFile();
 
@@ -210,15 +204,15 @@ int main(int argc, char * argv[]){
 
   /* ========== DEVELOPMENT ONLY ========== */
 
-  // dumpMemory();
+  dumpMemory();
 
   // Reset memory spaces
-  //memset(memory->fragment, -1, sizeof(struct segPage)*MEMSIZE);
+  memset(memory[0].fragment, -1, MEMSIZE);
 
   /* TestArea */
   printf("\n=== Unit tests ===\n");
   printf("MEMSIZE: %i\n", MEMSIZE);
-  printf("TotalPages: %lu\n", NUMPAGES);
+  //printf("TotalPages: %lu\n", NUMPAGES);
   //printf("pagInd(2): %i\n", getPageIndex(2));
   //printf("pagInd(6): %i\n", getPageIndex(6));
   //printf("pagInd(7): %i\n", getPageIndex(7));
@@ -226,7 +220,15 @@ int main(int argc, char * argv[]){
   //printf("emptyPage: %i\n", getEmptyPage());
   //writePage(0,3,1);
   //writePage(1,3,2);
-  //writePage(2,3,3);
+  dumpMemory();
+  writePage(2,3,3);
+  dumpMemory();
+  //printf("resSpc: %i\n", enoughSpace(0,3));
+  //printf("resSpc: %i\n", enoughSpace(1,3));
+  //printf("resSpc: %i\n", enoughSpace(0,2));
+  //printf("res: %i\n", getSegmentStart(2));
+  //printf("res: %i\n", getSegmentStart(3));
+  //printf("res: %i\n", getSegmentStart(4));
   //printf("totEmptyPages: %i\n", getTotalEmptyPages());
   //printf("emptyPage: %i\n", getEmptyPage());
   //resetPage(1);
@@ -264,4 +266,137 @@ void v(int semid, int numSem) {
       perror("Sem V error");
       exit(EXIT_FAILURE);
     }
+}
+
+
+/* PAGING HELPERS */
+int getEmptyPage(){
+  for (int i = 0; i < NUMPAGES; i++) {
+    if (memory[0].fragment[i].processNum == -1) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+int getProcessPage(int tid){
+  for (int i = 0; i < NUMPAGES; i++) {
+    if (memory[0].fragment[i].processNum == tid) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+int getTotalEmptyPages(){
+  int res = 0;
+  for (int i = 0; i < NUMPAGES; i++) {
+    if (memory[0].fragment[i].processNum == -1) {
+      res++;
+    }
+  }
+  return res;
+}
+
+void writePage(int pageNum, int threadId, int threadPageNum){
+  memory[0].fragment[pageNum].processNum = threadId;
+  memory[0].fragment[pageNum].numLogicPage = threadPageNum;
+  //printf("Writing to page %i: tid(%i) thrPage(%i)\n", pageNum, threadId, threadPageNum);
+}
+
+void resetPage(int pageNum){
+  memory[0].fragment[pageNum].processNum = -1;
+}
+
+int allocateThreadShm(void *arg){
+  struct thread_info *tinfo = arg;
+  printf("Allocating %i pages from tid: %i.\n", tinfo->numPages, tinfo->thread_num);
+  if (schema == PAGINATION) {
+    int empPag = getTotalEmptyPages(), ep;
+    if (empPag < tinfo->numPages) return -1;
+    for (int i = 0; i < tinfo->numPages; i++) {
+      ep = getEmptyPage();
+      if(ep == -1) return -1;
+      writePage(ep, tinfo->thread_num, i+1);
+    }
+  }else{
+    int empPag = getTotalEmptyPages();
+    int segStart = getSegmentStart(tinfo->numPages);
+    if (segStart == -1) return -1;
+    for (int i = 0; i < tinfo->numPages; i++) {
+      writePage(segStart + i, tinfo->thread_num, i+1);
+    }
+  }
+  return 0;
+}
+
+int releaseThreadShm(void *arg){
+  struct thread_info *tinfo = arg;
+  printf("Releasing %i pages from tid: %i.\n", tinfo->numPages, tinfo->thread_num);
+  if (schema == PAGINATION) {
+    int empPag = getTotalEmptyPages();
+    if (empPag < tinfo->numPages) return -1;
+    for (int i = 0; i < tinfo->numPages; i++) {
+      writePage(getProcessPage(tinfo->thread_num), -1, -1);
+    }
+  }else{
+    printf("SEGMENTATION NOT IMPLEMENTED. QUITTING.\n");
+    exit(EXIT_FAILURE);
+  }
+  return 0;
+}
+
+int nextThreadPage(int tid, int pastPage){
+  if (pastPage != 0) pastPage++;
+  for (int i = pastPage; i < NUMPAGES; i++) {
+    if (memory[0].fragment[i].processNum == tid) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+int getSegmentStart(int size){
+  int crash = 0;
+  for (int i = 0; i < NUMPAGES-size; i++) {
+    if (memory[0].fragment[i].processNum == -1) {
+      printf("calling eSpc: %i pages since page %i\n", size, i);
+      crash = enoughSpace(i, size);
+      if (crash == 0) return i;
+      crash = 0;
+    }
+  }
+  return -1;
+}
+
+int enoughSpace(int page, int size){
+  int crash = 0;
+  printf("spc: %i in %i?\n", size, page);
+  for (int i = page; i < page+size; i++) {
+    if (memory[0].fragment[i].processNum != -1) {
+      return 1;
+    }
+  }
+  return crash;
+}
+
+void dumpMemory(){
+  int i, k = 0;
+  printf("MEM-DUMP (%p):\n", memory);
+  printf("  MEM\n");
+  for (i = 0; i < MEMSIZE; i++) {
+    if(memory[0].fragment[i].processNum != -1) {
+      printf("(%i,%i),", memory[0].fragment[i].processNum, memory[0].fragment[i].numLogicPage);
+      if (k % 10 == 9) printf("\n");
+      k++;
+    }
+  }
+  printf("\n%i Pages written.", k);
+  printf("\n  THREADS: PENDING:");
+  /*for (int i = 0; i < MEMSIZE; i++) {
+    printf("%i, ", memory[0].threads[i].thread_num);
+  }*/
+  printf("\n  SEMID: %i\n", memory[0].semaphore);
+
+  printf("\n");
 }
