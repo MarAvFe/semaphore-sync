@@ -150,7 +150,24 @@ int main(int argc, char * argv[]){
   ptrLogFile = "actions.log";
   num_threads = randint(3,14);
   memory_size = sizeof(struct sharedMemory);
-  schema = SEGMENTATION;
+  int mode = 0;
+  
+	printf("╔═════════════════════════════════════╗\n");
+	printf("║               PRODUCER	          ║\n");
+	printf("╚═════════════════════════════════════╝\n");
+	  
+  printf("0 - PAGINATION \n");
+  printf("1 - SEGMENTATION \n");  
+  printf(">>  Enter mode (0|1): ");
+  scanf("%d",&mode);
+  
+  if(mode == 1){
+  	schema = SEGMENTATION;
+  }
+  else{
+  	schema = PAGINATION;
+  } 	
+  
 
   createFile();
 
